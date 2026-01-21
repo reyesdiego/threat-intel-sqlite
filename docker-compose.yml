@@ -1,0 +1,34 @@
+services:
+  threat-intel-db:
+    build: .
+    container_name: threat-intel-sqlite
+    environment:
+      - DB_DIR=/sqlite
+      - DB_NAME=threat_intel.db
+      - BACKUP_PATH=/backup/threat_intel.db
+    volumes:
+      # Persisted database location on host
+      - ./sqlite:/sqlite
+
+      # Mount the backup as read-only inside the container
+      # Backup file is located in ./backup directory
+      - ${BACKUP_SRC:-./backup/threat_intel.db}:/backup/threat_intel.db:ro
+
+  redis:
+    image: redis:7-alpine
+    container_name: threat-intel-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  redis-data:
+    driver: local
