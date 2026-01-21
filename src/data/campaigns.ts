@@ -1,5 +1,4 @@
 import db from './database/db';
-import * as QueryString from "node:querystring";
 
 export const getCampaignDetails = (id: string) => {
 

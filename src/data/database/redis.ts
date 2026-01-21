@@ -6,8 +6,7 @@ const redisConfig = {
     password: process.env.REDIS_PASSWORD || undefined,
     db: parseInt(process.env.REDIS_DB || '0', 10),
     retryStrategy: (times: number) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
+        return Math.min(times * 50, 2000);
     },
     maxRetriesPerRequest: 3,
     enableReadyCheck: true,
