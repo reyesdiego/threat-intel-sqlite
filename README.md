@@ -30,7 +30,7 @@ A comprehensive REST API for threat intelligence analysis, providing endpoints t
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/reyesdiego/threat-intel-sqlite
 cd threat-intel-sqlite
 ```
 
@@ -134,7 +134,7 @@ The Redis client is configured with:
 Import the Redis client:
 
 ```typescript
-import redis from './database/redis';
+import redis from '../data/database/redis';
 
 // Example: Set a value
 await redis.set('key', 'value');
@@ -175,17 +175,36 @@ Once the server is running, access the interactive API documentation at:
 ```
 threat-intel-sqlite/
 ├── src/
-│   ├── data/           # Data access layer
-│   ├── database/       # Database configurations
-│   │   ├── db.ts      # SQLite database client
-│   │   └── redis.ts   # Redis client
-│   ├── errors/         # Custom error classes
-│   ├── routes/         # API route handlers
-│   └── server.ts       # Express server setup
-├── data/               # SQLite database files
-├── docker-compose.yml  # Docker services configuration
-├── Dockerfile          # SQLite database container
-└── package.json        # Dependencies and scripts
+│   ├── __tests__/              # Test setup and configuration
+│   │   └── setup.ts           # Jest test setup (console suppression)
+│   ├── api/                    # API layer
+│   │   ├── errors/             # Custom HTTP error classes
+│   │   │   └── http-errors.ts
+│   │   ├── middleware/        # Express middleware
+│   │   │   └── no-cache.ts    # HTTP cache control middleware
+│   │   ├── routes/            # API route handlers
+│   │   │   ├── __tests__/     # Route integration tests
+│   │   │   │   └── campaigns.test.ts
+│   │   │   ├── campaigns.ts   # Campaign endpoints
+│   │   │   ├── dashboard.ts   # Dashboard endpoints
+│   │   │   ├── indicators.ts  # Indicator endpoints
+│   │   │   └── index.ts       # Route initialization
+│   │   └── server.ts          # Express server setup
+│   └── data/                   # Data access layer
+│       ├── campaigns.ts        # Campaign data queries
+│       ├── dashboard.ts         # Dashboard data queries
+│       ├── indicators.ts        # Indicator data queries
+│       └── database/           # Database clients
+│           ├── db.ts          # SQLite database client
+│           └── redis.ts        # Redis client
+├── backup/                     # Database backup files
+├── docker-compose.yml          # Docker services configuration
+├── docker-entrypoint.sh        # SQLite container entrypoint
+├── Dockerfile                  # SQLite database container
+├── jest.config.js              # Jest test configuration
+├── package.json                # Dependencies and scripts
+├── tsconfig.json               # TypeScript configuration
+└── README.md                   # Project documentation
 ```
 
 ## Scripts
