@@ -16,7 +16,7 @@ describe('GET /api/campaigns/:id/indicators', () => {
         app.use('/api/campaigns', campaignsRouter);
         
         // Error handling middleware (same as in server.ts)
-        app.use((err: any, req: Request, res: Response) => {
+        app.use((err: any, req: Request, res: Response, next: NextFunction) => {
             if (err instanceof HttpError) {
                 return res.status(err.status).json({
                     error: err.message,
@@ -30,6 +30,11 @@ describe('GET /api/campaigns/:id/indicators', () => {
         
         // Clear all mocks before each test
         jest.clearAllMocks();
+    });
+
+    afterEach(() => {
+        // Clean up any pending requests
+        jest.restoreAllMocks();
     });
 
     describe('Successful requests', () => {
