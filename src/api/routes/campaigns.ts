@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import {getCampaignDetails, getIndicators} from "../../data/campaigns";
+import {getCampaignDetails} from "../../data/campaigns";
 import {NotFound, WrongParameters} from "../errors/http-errors";
 
 const router = express.Router();
@@ -59,37 +59,13 @@ router.get('/:id/indicators', (req: Request, res: Response, next: NextFunction) 
             throw new WrongParameters('Invalid group_by parameter. Must be "day" or "week"', { group_by });
         }
 
-        const campaign = getCampaignDetails(id);
+        const campaign = getCampaignDetails(id, start_date, end_date, group_by);
 
         if (!campaign) {
             throw new NotFound('Campaign not found', {id})
         }
-        const {
-            timelineArray,
-            uniqueIps,
-            uniqueDomains,
-            totalIndicators,
-            durationDays
-        } = getIndicators(id, start_date, end_date, group_by, campaign);
 
-        return res.json({
-            campaign: {
-                id: campaign.id,
-                name: campaign.name,
-                description: campaign.description,
-                first_seen: campaign.first_seen,
-                last_seen: campaign.last_seen,
-                status: campaign.status
-            },
-            timeline: timelineArray,
-            summary: {
-                total_indicators: totalIndicators,
-                unique_ips: uniqueIps.size,
-                unique_domains: uniqueDomains.size,
-                duration_days: durationDays
-            }
-        });
-
+        res.json(JSON.parse(campaign.data));
     } catch (error) {
         console.error('Error fetching campaign indicators:', error);
         next(error);

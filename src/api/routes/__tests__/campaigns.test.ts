@@ -4,7 +4,7 @@ import campaignsRouter from '../campaigns';
 import * as campaignsData from '../../../data/campaigns';
 import { HttpError } from '../../errors/http-errors';
 
-// Mock the campaigns sqlite module
+// Mock the campaigns data module
 jest.mock('../../../data/campaigns');
 
 describe('GET /api/campaigns/:id/indicators', () => {
@@ -16,7 +16,7 @@ describe('GET /api/campaigns/:id/indicators', () => {
         app.use('/api/campaigns', campaignsRouter);
         
         // Error handling middleware (same as in server.ts)
-        app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+        app.use((err: any, req: Request, res: Response) => {
             if (err instanceof HttpError) {
                 return res.status(err.status).json({
                     error: err.message,
@@ -35,39 +35,7 @@ describe('GET /api/campaigns/:id/indicators', () => {
     describe('Successful requests', () => {
         it('should return campaign indicators with default group_by=day', async () => {
             const campaignId = 'test-campaign-id';
-            const mockCampaign = {
-                id: campaignId,
-                name: 'Test Campaign',
-                description: 'Test Description',
-                first_seen: '2024-01-01T00:00:00Z',
-                last_seen: '2024-01-10T00:00:00Z',
-                status: 'active'
-            };
-
-            const mockIndicators = {
-                timelineArray: [
-                    {
-                        period: '2024-01-01',
-                        indicators: [
-                            { id: 'ind1', type: 'ip', value: '192.168.1.1' }
-                        ],
-                        counts: { ip: 1, domain: 0, url: 0, hash: 0 }
-                    }
-                ],
-                uniqueIps: new Set(['192.168.1.1']),
-                uniqueDomains: new Set(['example.com']),
-                totalIndicators: 1,
-                durationDays: 9
-            };
-
-            (campaignsData.getCampaignDetails as jest.Mock).mockReturnValue(mockCampaign);
-            (campaignsData.getIndicators as jest.Mock).mockReturnValue(mockIndicators);
-
-            const response = await request(app)
-                .get(`/api/campaigns/${campaignId}/indicators`)
-                .expect(200);
-
-            expect(response.body).toEqual({
+            const mockResponseData = {
                 campaign: {
                     id: campaignId,
                     name: 'Test Campaign',
@@ -76,54 +44,75 @@ describe('GET /api/campaigns/:id/indicators', () => {
                     last_seen: '2024-01-10T00:00:00Z',
                     status: 'active'
                 },
-                timeline: mockIndicators.timelineArray,
+                timeline: [
+                    {
+                        period: '2024-01-01',
+                        indicators: [
+                            { id: 'ind1', type: 'ip' }
+                        ],
+                        counts: { ip: 1, domain: 0, url: 0, hash: 0 }
+                    }
+                ],
                 summary: {
                     total_indicators: 1,
                     unique_ips: 1,
-                    unique_domains: 1,
-                    duration_days: 9
+                    unique_domains: 0,
+                    duration: 9
                 }
-            });
+            };
 
-            expect(campaignsData.getCampaignDetails).toHaveBeenCalledWith(campaignId);
-            expect(campaignsData.getIndicators).toHaveBeenCalledWith(
+            const mockCampaignResult = {
+                data: JSON.stringify(mockResponseData)
+            };
+
+            (campaignsData.getCampaignDetails as jest.Mock).mockReturnValue(mockCampaignResult);
+
+            const response = await request(app)
+                .get(`/api/campaigns/${campaignId}/indicators`)
+                .expect(200);
+
+            expect(response.body).toEqual(mockResponseData);
+            expect(campaignsData.getCampaignDetails).toHaveBeenCalledWith(
                 campaignId,
                 undefined,
                 undefined,
-                'day',
-                mockCampaign
+                'day'
             );
         });
 
         it('should return campaign indicators with group_by=week', async () => {
             const campaignId = 'test-campaign-id';
-            const mockCampaign = {
-                id: campaignId,
-                name: 'Test Campaign',
-                description: 'Test Description',
-                first_seen: '2024-01-01T00:00:00Z',
-                last_seen: '2024-01-10T00:00:00Z',
-                status: 'active'
-            };
-
-            const mockIndicators = {
-                timelineArray: [
+            const mockResponseData = {
+                campaign: {
+                    id: campaignId,
+                    name: 'Test Campaign',
+                    description: 'Test Description',
+                    first_seen: '2024-01-01T00:00:00Z',
+                    last_seen: '2024-01-10T00:00:00Z',
+                    status: 'active'
+                },
+                timeline: [
                     {
                         period: '2023-12-31',
                         indicators: [
-                            { id: 'ind1', type: 'ip', value: '192.168.1.1' }
+                            { id: 'ind1', type: 'ip' }
                         ],
                         counts: { ip: 1, domain: 0, url: 0, hash: 0 }
                     }
                 ],
-                uniqueIps: new Set(['192.168.1.1']),
-                uniqueDomains: new Set(),
-                totalIndicators: 1,
-                durationDays: 9
+                summary: {
+                    total_indicators: 1,
+                    unique_ips: 1,
+                    unique_domains: 0,
+                    duration: 9
+                }
             };
 
-            (campaignsData.getCampaignDetails as jest.Mock).mockReturnValue(mockCampaign);
-            (campaignsData.getIndicators as jest.Mock).mockReturnValue(mockIndicators);
+            const mockCampaignResult = {
+                data: JSON.stringify(mockResponseData)
+            };
+
+            (campaignsData.getCampaignDetails as jest.Mock).mockReturnValue(mockCampaignResult);
 
             const response = await request(app)
                 .get(`/api/campaigns/${campaignId}/indicators`)
@@ -131,12 +120,11 @@ describe('GET /api/campaigns/:id/indicators', () => {
                 .expect(200);
 
             expect(response.body.campaign.id).toBe(campaignId);
-            expect(campaignsData.getIndicators).toHaveBeenCalledWith(
+            expect(campaignsData.getCampaignDetails).toHaveBeenCalledWith(
                 campaignId,
                 undefined,
                 undefined,
-                'week',
-                mockCampaign
+                'week'
             );
         });
 
@@ -144,37 +132,40 @@ describe('GET /api/campaigns/:id/indicators', () => {
             const campaignId = 'test-campaign-id';
             const startDate = '2024-01-05T00:00:00Z';
             const endDate = '2024-01-08T00:00:00Z';
-            const mockCampaign = {
-                id: campaignId,
-                name: 'Test Campaign',
-                description: 'Test Description',
-                first_seen: '2024-01-01T00:00:00Z',
-                last_seen: '2024-01-10T00:00:00Z',
-                status: 'active'
+            const mockResponseData = {
+                campaign: {
+                    id: campaignId,
+                    name: 'Test Campaign',
+                    description: 'Test Description',
+                    first_seen: '2024-01-01T00:00:00Z',
+                    last_seen: '2024-01-10T00:00:00Z',
+                    status: 'active'
+                },
+                timeline: [],
+                summary: {
+                    total_indicators: 0,
+                    unique_ips: 0,
+                    unique_domains: 0,
+                    duration: 9
+                }
             };
 
-            const mockIndicators = {
-                timelineArray: [],
-                uniqueIps: new Set(),
-                uniqueDomains: new Set(),
-                totalIndicators: 0,
-                durationDays: 9
+            const mockCampaignResult = {
+                data: JSON.stringify(mockResponseData)
             };
 
-            (campaignsData.getCampaignDetails as jest.Mock).mockReturnValue(mockCampaign);
-            (campaignsData.getIndicators as jest.Mock).mockReturnValue(mockIndicators);
+            (campaignsData.getCampaignDetails as jest.Mock).mockReturnValue(mockCampaignResult);
 
             await request(app)
                 .get(`/api/campaigns/${campaignId}/indicators`)
                 .query({ start_date: startDate, end_date: endDate })
                 .expect(200);
 
-            expect(campaignsData.getIndicators).toHaveBeenCalledWith(
+            expect(campaignsData.getCampaignDetails).toHaveBeenCalledWith(
                 campaignId,
                 startDate,
                 endDate,
-                'day',
-                mockCampaign
+                'day'
             );
         });
     });
@@ -195,7 +186,6 @@ describe('GET /api/campaigns/:id/indicators', () => {
             });
 
             expect(campaignsData.getCampaignDetails).not.toHaveBeenCalled();
-            expect(campaignsData.getIndicators).not.toHaveBeenCalled();
         });
 
         it('should return 404 when campaign is not found', async () => {
@@ -213,8 +203,12 @@ describe('GET /api/campaigns/:id/indicators', () => {
                 details: { id: campaignId }
             });
 
-            expect(campaignsData.getCampaignDetails).toHaveBeenCalledWith(campaignId);
-            expect(campaignsData.getIndicators).not.toHaveBeenCalled();
+            expect(campaignsData.getCampaignDetails).toHaveBeenCalledWith(
+                campaignId,
+                undefined,
+                undefined,
+                'day'
+            );
         });
 
         it('should return 500 when getCampaignDetails throws an error', async () => {
@@ -232,21 +226,13 @@ describe('GET /api/campaigns/:id/indicators', () => {
             expect(response.body).toEqual({ error: 'Internal server error' });
         });
 
-        it('should return 500 when getIndicators throws an error', async () => {
+        it('should return 500 when campaign.data is invalid JSON', async () => {
             const campaignId = 'test-campaign-id';
-            const mockCampaign = {
-                id: campaignId,
-                name: 'Test Campaign',
-                description: 'Test Description',
-                first_seen: '2024-01-01T00:00:00Z',
-                last_seen: '2024-01-10T00:00:00Z',
-                status: 'active'
+            const mockCampaignResult = {
+                data: 'invalid json{'
             };
 
-            (campaignsData.getCampaignDetails as jest.Mock).mockReturnValue(mockCampaign);
-            (campaignsData.getIndicators as jest.Mock).mockImplementation(() => {
-                throw new Error('Database query error');
-            });
+            (campaignsData.getCampaignDetails as jest.Mock).mockReturnValue(mockCampaignResult);
 
             const response = await request(app)
                 .get(`/api/campaigns/${campaignId}/indicators`)
@@ -259,25 +245,29 @@ describe('GET /api/campaigns/:id/indicators', () => {
     describe('Request parameter handling', () => {
         it('should handle array query parameters correctly', async () => {
             const campaignId = 'test-campaign-id';
-            const mockCampaign = {
-                id: campaignId,
-                name: 'Test Campaign',
-                description: 'Test Description',
-                first_seen: '2024-01-01T00:00:00Z',
-                last_seen: '2024-01-10T00:00:00Z',
-                status: 'active'
+            const mockResponseData = {
+                campaign: {
+                    id: campaignId,
+                    name: 'Test Campaign',
+                    description: 'Test Description',
+                    first_seen: '2024-01-01T00:00:00Z',
+                    last_seen: '2024-01-10T00:00:00Z',
+                    status: 'active'
+                },
+                timeline: [],
+                summary: {
+                    total_indicators: 0,
+                    unique_ips: 0,
+                    unique_domains: 0,
+                    duration: 9
+                }
             };
 
-            const mockIndicators = {
-                timelineArray: [],
-                uniqueIps: new Set(),
-                uniqueDomains: new Set(),
-                totalIndicators: 0,
-                durationDays: 9
+            const mockCampaignResult = {
+                data: JSON.stringify(mockResponseData)
             };
 
-            (campaignsData.getCampaignDetails as jest.Mock).mockReturnValue(mockCampaign);
-            (campaignsData.getIndicators as jest.Mock).mockReturnValue(mockIndicators);
+            (campaignsData.getCampaignDetails as jest.Mock).mockReturnValue(mockCampaignResult);
 
             // When query param is an array, it should use the first value or default
             await request(app)
@@ -286,47 +276,49 @@ describe('GET /api/campaigns/:id/indicators', () => {
                 .expect(200);
 
             // Should default to 'day' when array is provided
-            expect(campaignsData.getIndicators).toHaveBeenCalledWith(
+            expect(campaignsData.getCampaignDetails).toHaveBeenCalledWith(
                 campaignId,
                 undefined,
                 undefined,
-                'day',
-                mockCampaign
+                'day'
             );
         });
 
         it('should use default group_by when not provided', async () => {
             const campaignId = 'test-campaign-id';
-            const mockCampaign = {
-                id: campaignId,
-                name: 'Test Campaign',
-                description: 'Test Description',
-                first_seen: '2024-01-01T00:00:00Z',
-                last_seen: '2024-01-10T00:00:00Z',
-                status: 'active'
+            const mockResponseData = {
+                campaign: {
+                    id: campaignId,
+                    name: 'Test Campaign',
+                    description: 'Test Description',
+                    first_seen: '2024-01-01T00:00:00Z',
+                    last_seen: '2024-01-10T00:00:00Z',
+                    status: 'active'
+                },
+                timeline: [],
+                summary: {
+                    total_indicators: 0,
+                    unique_ips: 0,
+                    unique_domains: 0,
+                    duration: 9
+                }
             };
 
-            const mockIndicators = {
-                timelineArray: [],
-                uniqueIps: new Set(),
-                uniqueDomains: new Set(),
-                totalIndicators: 0,
-                durationDays: 9
+            const mockCampaignResult = {
+                data: JSON.stringify(mockResponseData)
             };
 
-            (campaignsData.getCampaignDetails as jest.Mock).mockReturnValue(mockCampaign);
-            (campaignsData.getIndicators as jest.Mock).mockReturnValue(mockIndicators);
+            (campaignsData.getCampaignDetails as jest.Mock).mockReturnValue(mockCampaignResult);
 
             await request(app)
                 .get(`/api/campaigns/${campaignId}/indicators`)
                 .expect(200);
 
-            expect(campaignsData.getIndicators).toHaveBeenCalledWith(
+            expect(campaignsData.getCampaignDetails).toHaveBeenCalledWith(
                 campaignId,
                 undefined,
                 undefined,
-                'day', // Default value
-                mockCampaign
+                'day' // Default value
             );
         });
     });
