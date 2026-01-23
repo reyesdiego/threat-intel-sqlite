@@ -29,6 +29,34 @@ services:
       retries: 3
       start_period: 10s
 
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: threat-intel-api
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - PORT=${PORT:-3000}
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
+      - NODE_ENV=${NODE_ENV:-production}
+    volumes:
+      # Mount SQLite database directory (read-write for potential writes)
+      - ./sqlite:/app/sqlite
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 volumes:
   redis-data:
     driver: local

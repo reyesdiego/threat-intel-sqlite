@@ -51,18 +51,37 @@ REDIS_DB=0
 ---
 ## Running the Application
 
-### Development Mode
+> **📋 Prerequisites Checklist**
+> 
+> Before running the application in any mode, ensure you have:
+> - ✅ Installed dependencies: `npm install`
+> - ✅ **Placed the database backup file `threat_intel.db` in the `/backup` directory**
+> 
+> The database service requires the backup file to initialize properly.
 
-1. Database 💥
+### Development Mode (Local Node.js with Docker Services)
 
-#### ⚠️ Paste the SQLite Database Backup threat_intel.db into the /backup directory
+> **⚠️ IMPORTANT: Database Setup Required**
+> 
+> **Before starting the application, you must paste the SQLite database backup file `threat_intel.db` into the `/backup` directory in the project root.**
+> 
+> The database service will automatically initialize from this backup file on first startup.
 
-2. Start Redis and SQLite database using Docker Compose:
+1. **Prepare the database backup:**
+   ```bash
+   # Ensure the backup directory exists
+   mkdir -p backup
+   
+   # Copy your threat_intel.db file to the backup directory
+   cp /path/to/your/threat_intel.db ./backup/threat_intel.db
+   ```
+
+2. Start only Redis and SQLite database (without the app):
 ```bash
-docker-compose up -d &
+docker-compose up -d redis threat-intel-db
 ```
 
-3. Start the development server:
+3. Start the development server locally:
 ```bash
 npm run dev
 ```
@@ -71,7 +90,7 @@ The API will be available at `http://localhost:3000`
 
 The Swagger documentation at `http://localhost:3000/api-docs`
 
-### Production Mode
+### Production Mode (Local Node.js)
 
 1. Build the TypeScript code:
 ```bash
@@ -83,15 +102,82 @@ npm run build
 npm start
 ```
 
+### Docker Mode (All Services in Docker)
+
+> **⚠️ IMPORTANT: Database Setup Required**
+> 
+> **Before starting the Docker services, you must paste the SQLite database backup file `threat_intel.db` into the `/backup` directory in the project root.**
+> 
+> The database service will automatically initialize from this backup file on first startup.
+
+To run the entire application stack in Docker:
+
+1. **Prepare the database backup:**
+   ```bash
+   # Ensure the backup directory exists
+   mkdir -p backup
+   
+   # Copy your threat_intel.db file to the backup directory
+   cp /path/to/your/threat_intel.db ./backup/threat_intel.db
+   ```
+
+2. Start all services (including the Node.js app):
+```bash
+docker-compose up -d
+```
+
+2. To stop only the app container (keeping SQLite and Redis running):
+```bash
+docker-compose stop app
+```
+
+3. To start the app container again:
+```bash
+docker-compose start app
+```
+
+4. To view app logs:
+```bash
+docker-compose logs -f app
+```
+
+### Running Services Independently
+
+**Start only SQLite and Redis (for local development):**
+```bash
+docker-compose up -d redis threat-intel-db
+```
+
+**Stop only the app container (keep SQLite and Redis running):**
+```bash
+docker-compose stop app
+```
+
+**Start only the app container:**
+```bash
+docker-compose start app
+```
+
+**Stop all services:**
+```bash
+docker-compose down
+```
+
+**Stop only SQLite and Redis (keep app running if it was started separately):**
+```bash
+docker-compose stop redis threat-intel-db
+```
+
 ## Docker Services
 
-The project includes Docker Compose configuration for running supporting services:
+The project includes Docker Compose configuration for running services:
 
 ### SQLite Database Service
 
 - **Container**: `threat-intel-sqlite`
 - **Service**: `threat-intel-db`
 - **Purpose**: Manages the SQLite database with persistence
+- **Volume**: `./sqlite` directory on host
 
 ### Redis Service
 
@@ -105,19 +191,54 @@ The project includes Docker Compose configuration for running supporting service
   - Health checks configured
   - Automatic reconnection handling
 
-To start all services:
+### Node.js Application Service
+
+- **Container**: `threat-intel-api`
+- **Service**: `app`
+- **Dockerfile**: `Dockerfile.app`
+- **Port**: `3000` (configurable via `PORT` environment variable)
+- **Features**:
+  - Multi-stage build for optimized image size
+  - Health checks configured
+  - Connects to Redis and SQLite services
+  - Can be stopped independently while keeping SQLite and Redis running
+
+### Service Management
+
+**Start all services:**
 ```bash
 docker-compose up -d
 ```
 
-To stop all services:
+**Start only SQLite and Redis (for local development):**
+```bash
+docker-compose up -d redis threat-intel-db
+```
+
+**Start only the app service:**
+```bash
+docker-compose up -d app
+```
+
+**Stop all services:**
 ```bash
 docker-compose down
 ```
 
-To view Redis logs:
+**Stop only the app (keep SQLite and Redis running):**
 ```bash
-docker-compose logs redis
+docker-compose stop app
+```
+
+**View service logs:**
+```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f app
+docker-compose logs -f redis
+docker-compose logs -f threat-intel-db
 ```
 
 ## Redis Configuration
