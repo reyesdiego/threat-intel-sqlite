@@ -2,37 +2,68 @@ import db from './database/db';
 
 
 export const getIndicatorDetails = (id: string) => {
-    const indicator = db.prepare(`
-              SELECT id, type, value, confidence, first_seen, last_seen, tags
-              FROM indicators
-              WHERE id = ?
-            `).get(id) as any;
+    const result = db.prepare(`
+        SELECT json_object(
+            'indicator', json_object(
+                'id', i.id,
+                'type', i.type,
+                'value', i.value,
+                'confidence', i.confidence,
+                'first_seen', i.first_seen,
+                'last_seen', i.last_seen,
+                'tags', i.tags
+            ),
+            'threatActors', (
+                SELECT json_group_array(
+                    json_object(
+                        'id', ta.id,
+                        'name', ta.name,
+                        'confidence', ac.confidence
+                    )
+                )
+                FROM threat_actors ta
+                JOIN actor_campaigns ac ON ta.id = ac.threat_actor_id
+                JOIN campaign_indicators ci ON ac.campaign_id = ci.campaign_id
+                WHERE ci.indicator_id = i.id
+                GROUP BY ta.id, ta.name, ac.confidence
+                ORDER BY ac.confidence DESC
+            ),
+            'campaigns', (
+                SELECT json_group_array(
+                    json_object(
+                        'id', c.id,
+                        'name', c.name,
+                        'status', c.status
+                    )
+                )
+                FROM campaigns c
+                JOIN campaign_indicators ci ON c.id = ci.campaign_id
+                WHERE ci.indicator_id = i.id
+                ORDER BY ci.observed_at DESC
+            ),
+            'relatedIndicators', (
+                SELECT json_group_array(
+                    json_object(
+                        'id', i2.id,
+                        'type', i2.type,
+                        'value', i2.value,
+                        'relationship', ir.relationship_type
+                    )
+                )
+                FROM indicators i2
+                JOIN indicator_relationships ir ON i2.id = ir.target_indicator_id
+                WHERE ir.source_indicator_id = i.id
+                ORDER BY ir.first_observed DESC
+                LIMIT 5
+            )
+        ) AS data
+        FROM indicators i
+        WHERE i.id = ?
+    `).get(id) as { data: string } | undefined;
 
-    const threatActors = db.prepare(`
-              SELECT DISTINCT ta.id, ta.name, ac.confidence
-              FROM threat_actors ta
-              JOIN actor_campaigns ac ON ta.id = ac.threat_actor_id
-              JOIN campaign_indicators ci ON ac.campaign_id = ci.campaign_id
-              WHERE ci.indicator_id = ?
-              ORDER BY ac.confidence DESC
-            `).all(id) as any[];
+    if (!result) {
+        return { indicator: null, threatActors: [], campaigns: [], relatedIndicators: [] };
+    }
 
-    const campaigns = db.prepare(`
-              SELECT c.id, c.name, c.status
-              FROM campaigns c
-              JOIN campaign_indicators ci ON c.id = ci.campaign_id
-              WHERE ci.indicator_id = ?
-              ORDER BY ci.observed_at DESC
-            `).all(id) as any[];
-
-    const relatedIndicators = db.prepare(`
-              SELECT i.id, i.type, i.value, ir.relationship_type as relationship
-              FROM indicators i
-              JOIN indicator_relationships ir ON i.id = ir.target_indicator_id
-              WHERE ir.source_indicator_id = ?
-              ORDER BY ir.first_observed DESC
-              LIMIT 5
-            `).all(id) as any[];
-
-    return { indicator, threatActors, campaigns, relatedIndicators};
+    return JSON.parse(result.data);
 }
