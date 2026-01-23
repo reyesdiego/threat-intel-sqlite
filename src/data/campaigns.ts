@@ -46,7 +46,7 @@ export const getCampaignDetails = (id: string, start_date: string | undefined, e
                                                 FROM campaign_indicators ci
                                                     JOIN indicators i ON ci.indicator_id = i.id
                                                 WHERE ci.campaign_id = c.id
-                                                    AND date(ci.observed_at) BETWEEN COALESCE(:start_date, ci.observed_at) AND COALESCE(:end_date, ci.observed_at)
+                                                    AND date(ci.observed_at) BETWEEN DATE(COALESCE(date(:start_date), ci.observed_at)) AND DATE(COALESCE(date(:end_date), ci.observed_at))
                                                 GROUP BY period
                                                 ORDER BY date(ci.observed_at)
                                         ) t
@@ -54,14 +54,14 @@ export const getCampaignDetails = (id: string, start_date: string | undefined, e
                           'summary', (
                                         SELECT json_object(
                                           'total_indicators', COUNT(*),
-                                          'unique_domains', SUM(CASE WHEN i.type='domain' THEN 1 ELSE 0 END),
-                                          'unique_ips', SUM(CASE WHEN i.type='ip' THEN 1 ELSE 0 END),
+                                          'unique_domains', COALESCE(SUM(CASE WHEN i.type='domain' THEN 1 ELSE 0 END), 0),
+                                          'unique_ips', COALESCE(SUM(CASE WHEN i.type='ip' THEN 1 ELSE 0 END), 0),
                                           'duration', julianday(c.last_seen) - julianday(c.first_seen)
                                         )
                                         FROM indicators i
                                         JOIN campaign_indicators ci ON ci.indicator_id = i.id
                                         WHERE ci.campaign_id = c.id
-                                           AND date(ci.observed_at) BETWEEN COALESCE(:start_date, ci.observed_at) AND COALESCE(:end_date, ci.observed_at)
+                                           AND date(ci.observed_at) BETWEEN DATE(COALESCE(:start_date, ci.observed_at)) AND DATE(COALESCE(:end_date, ci.observed_at))
                                     )
                         ) AS data
                          FROM campaigns c
