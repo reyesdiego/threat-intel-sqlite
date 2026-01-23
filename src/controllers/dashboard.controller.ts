@@ -30,11 +30,12 @@ export const getDashboardSummary = async (req: Request, res: Response, next: Nex
                 return res.header('cached', 'redis').json(JSON.parse(cachedData));
             }
         } catch (redisError) {
-            // If Redis fails, log but continue to database query
+            // If Redis fails, log but continue to a database query
             console.warn('[Redis] Cache read error, falling back to database:', redisError);
         }
 
-        const summary: DashboardSummary = getDashboardData(timeRange);
+        const summaryData = getDashboardData(timeRange);
+        const summary: DashboardSummary = JSON.parse(summaryData.data)
 
         // Store in cache (non-blocking)
         try {

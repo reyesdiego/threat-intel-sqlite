@@ -43,45 +43,71 @@ const getCutoffISOString = (hoursBack: number): string => {
 };
 /**
  * Retrieves summarized threat intelligence statistics from the database.
+ * Uses a single JSON query to fetch all dashboard data in one database round-trip.
  */
-export const getDashboardData = (timeRange: string): DashboardSummary => {
+export const getDashboardData = (timeRange: string) => {
     const hoursBack = TIME_RANGE_MAPPING[timeRange];
     const cutoffISO = getCutoffISOString(hoursBack);
 
-    const newIndicators = db.prepare(`
-        SELECT type, COUNT(*) as count
-        FROM indicators
-        WHERE first_seen >= ?
-        GROUP BY type
-    `).all(cutoffISO) as { type: string; count: number }[];
-
-    const activeCampaigns = db.prepare(`
-        SELECT COUNT(*) as count
-        FROM campaigns
-        WHERE status = 'active' AND last_seen >= ?
-    `).get(cutoffISO) as { count: number };
-
-    const topThreatActors = db.prepare(`
-        SELECT ta.id, ta.name, COUNT(DISTINCT ci.indicator_id) as indicator_count
-        FROM threat_actors ta
-            JOIN actor_campaigns ac ON ta.id = ac.threat_actor_id
-            JOIN campaign_indicators ci ON ac.campaign_id = ci.campaign_id
-        GROUP BY ta.id, ta.name
-        ORDER BY indicator_count DESC
-        LIMIT 5
-    `).all() as any[];
-
-    const totalDistribution = db.prepare(`
-        SELECT type, COUNT(*) as count
-        FROM indicators
-        GROUP BY type
-    `).all() as { type: string; count: number }[];
-
-    return {
-        time_range: timeRange,
-        new_indicators: formatIndicatorCounts(newIndicators),
-        active_campaigns: activeCampaigns.count,
-        top_threat_actors: topThreatActors,
-        indicator_distribution: formatIndicatorCounts(totalDistribution)
-    };
+    return db.prepare(`
+        SELECT json_object(
+            'time_range', :timeRange,
+            'new_indicators', (
+                SELECT json_object(
+                            'domain', domain, 
+                            'ip', ip,
+                            'url', url, 
+                            'hash', hash
+                    )
+                FROM (
+                    SELECT SUM(CASE WHEN i.type='domain' THEN 1 ELSE 0 END) AS domain,
+                        SUM(CASE WHEN i.type='url' THEN 1 ELSE 0 END) AS url,
+                        SUM(CASE WHEN i.type='hash' THEN 1 ELSE 0 END) AS hash,
+                        SUM(CASE WHEN i.type='ip' THEN 1 ELSE 0 END) AS ip
+                    FROM indicators i
+                    WHERE first_seen >= :cutoffISO
+                )
+            ),
+            'active_campaigns', (
+                SELECT COUNT(*)
+                FROM campaigns
+                WHERE status = 'active' AND last_seen >= :cutoffISO
+            ),
+            'top_threat_actors', (
+                SELECT json_group_array(
+                    json_object(
+                        'id', ta.id,
+                        'name', ta.name,
+                        'indicator_count', ta.indicator_count
+                    )
+                )
+                FROM (
+                    SELECT ta.id, ta.name, COUNT(DISTINCT ci.indicator_id) as indicator_count
+                    FROM threat_actors ta
+                    JOIN actor_campaigns ac ON ta.id = ac.threat_actor_id
+                    JOIN campaign_indicators ci ON ac.campaign_id = ci.campaign_id
+                    GROUP BY ta.id, ta.name
+                    ORDER BY indicator_count DESC
+                    LIMIT 5
+                ) ta
+            ),
+            'indicator_distribution', (
+                SELECT json_group_array(
+                               json_object(
+                                       'domain', domain,
+                                       'ip', ip,
+                                       'url', url,
+                                       'hash', hash
+                               )
+                )
+                FROM (
+                    SELECT SUM(CASE WHEN i.type='domain' THEN 1 ELSE 0 END) AS domain,
+                        SUM(CASE WHEN i.type='url' THEN 1 ELSE 0 END) AS url,
+                        SUM(CASE WHEN i.type='hash' THEN 1 ELSE 0 END) AS hash,
+                        SUM(CASE WHEN i.type='ip' THEN 1 ELSE 0 END) AS ip
+                    FROM indicators i
+                )
+            )
+        ) AS data
+    `).get({cutoffISO, timeRange}) as { data: string };
 };
