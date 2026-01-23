@@ -85,26 +85,47 @@ export const searchIndicators = (req: Request, res: Response, next: NextFunction
         query += ' ORDER BY i.last_seen DESC LIMIT ? OFFSET ?';
         const indicators = db.prepare(query).all([...params, limitNum, offset]) as any[];
 
-        const enrichedIndicators = indicators.map(indicator => {
-            const campaignCount = db.prepare(`
-                SELECT COUNT(DISTINCT campaign_id) as count
-                FROM campaign_indicators
-                WHERE indicator_id = ?
-              `).get(indicator.id) as any;
+        // Fix N+1 problem: Batch query for all counts in one go
+        if (indicators.length === 0) {
+            return res.json({
+                data: [],
+                total,
+                page: pageNum,
+                limit: limitNum,
+                total_pages: Math.ceil(total / limitNum)
+            });
+        }
 
-            const threatActorCount = db.prepare(`
-                SELECT COUNT(DISTINCT ac.threat_actor_id) as count
-                FROM campaign_indicators ci
-                    JOIN actor_campaigns ac ON ci.campaign_id = ac.campaign_id
-                WHERE ci.indicator_id = ?
-              `).get(indicator.id) as any;
+        const indicatorIds = indicators.map(i => i.id);
+        const placeholders = indicatorIds.map(() => '?').join(',');
 
-            return {
-                ...indicator,
-                campaign_count: campaignCount.count,
-                threat_actor_count: threatActorCount.count
-            };
-        });
+        // Batch query for campaign counts
+        const campaignCounts = db.prepare(`
+            SELECT indicator_id, COUNT(DISTINCT campaign_id) as count
+            FROM campaign_indicators
+            WHERE indicator_id IN (${placeholders})
+            GROUP BY indicator_id
+        `).all(indicatorIds) as { indicator_id: string; count: number }[];
+
+        // Batch query for threat actor counts
+        const threatActorCounts = db.prepare(`
+            SELECT ci.indicator_id, COUNT(DISTINCT ac.threat_actor_id) as count
+            FROM campaign_indicators ci
+            JOIN actor_campaigns ac ON ci.campaign_id = ac.campaign_id
+            WHERE ci.indicator_id IN (${placeholders})
+            GROUP BY ci.indicator_id
+        `).all(indicatorIds) as { indicator_id: string; count: number }[];
+
+        // Create maps for O(1) lookup
+        const campaignCountMap = new Map(campaignCounts.map(c => [c.indicator_id, c.count]));
+        const threatActorCountMap = new Map(threatActorCounts.map(t => [t.indicator_id, t.count]));
+
+        // Enrich indicators with counts
+        const enrichedIndicators = indicators.map(indicator => ({
+            ...indicator,
+            campaign_count: campaignCountMap.get(indicator.id) || 0,
+            threat_actor_count: threatActorCountMap.get(indicator.id) || 0
+        }));
 
         const totalPages = Math.ceil(total / limitNum);
 
@@ -130,26 +151,13 @@ export const getIndicatorById = (req: Request, res: Response, next: NextFunction
     try {
         const { id } = req.params;
 
-        const data = getIndicatorDetails(id);
+        const indicator = getIndicatorDetails(id);
 
-        if (!data.indicator) {
+        if (!indicator) {
             throw new NotFound('Indicator not found', { id });
         }
 
-        return res.json({
-            id: data.indicator.id,
-            type: data.indicator.type,
-            value: data.indicator.value,
-            confidence: data.indicator.confidence,
-            first_seen: data.indicator.first_seen,
-            last_seen: data.indicator.last_seen,
-            threat_actors: data.threatActors,
-            campaigns: data.campaigns.map(c => ({
-                ...c,
-                active: c.status === 'active'
-            })),
-            related_indicators: data.relatedIndicators
-        });
+        return res.json(JSON.parse(indicator.data));
 
     } catch (error) {
         console.error('Error fetching indicator:', error);

@@ -1,19 +1,16 @@
 import db from './database/db';
 
-
 export const getIndicatorDetails = (id: string) => {
-    const result = db.prepare(`
+    return db.prepare(`
         SELECT json_object(
-            'indicator', json_object(
-                'id', i.id,
-                'type', i.type,
-                'value', i.value,
-                'confidence', i.confidence,
-                'first_seen', i.first_seen,
-                'last_seen', i.last_seen,
-                'tags', i.tags
-            ),
-            'threatActors', (
+            'id', i.id,
+            'type', i.type,
+            'value', i.value,
+            'confidence', i.confidence,
+            'first_seen', i.first_seen,
+            'last_seen', i.last_seen,
+            'tags', i.tags,
+            'threatActors', json((
                 SELECT json_group_array(
                     json_object(
                         'id', ta.id,
@@ -27,8 +24,8 @@ export const getIndicatorDetails = (id: string) => {
                 WHERE ci.indicator_id = i.id
                 GROUP BY ta.id, ta.name, ac.confidence
                 ORDER BY ac.confidence DESC
-            ),
-            'campaigns', (
+            )),
+            'campaigns', json((
                 SELECT json_group_array(
                     json_object(
                         'id', c.id,
@@ -40,8 +37,8 @@ export const getIndicatorDetails = (id: string) => {
                 JOIN campaign_indicators ci ON c.id = ci.campaign_id
                 WHERE ci.indicator_id = i.id
                 ORDER BY ci.observed_at DESC
-            ),
-            'relatedIndicators', (
+            )),
+            'relatedIndicators', json((
                 SELECT json_group_array(
                     json_object(
                         'id', i2.id,
@@ -55,15 +52,9 @@ export const getIndicatorDetails = (id: string) => {
                 WHERE ir.source_indicator_id = i.id
                 ORDER BY ir.first_observed DESC
                 LIMIT 5
-            )
+            ))
         ) AS data
         FROM indicators i
         WHERE i.id = ?
     `).get(id) as { data: string } | undefined;
-
-    if (!result) {
-        return { indicator: null, threatActors: [], campaigns: [], relatedIndicators: [] };
-    }
-
-    return JSON.parse(result.data);
 }
