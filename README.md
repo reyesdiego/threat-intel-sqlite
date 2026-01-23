@@ -178,40 +178,7 @@ Once the server is running, access the interactive API documentation at:
 
 ## Project Structure
 
-```
-threat-intel-sqlite/
-├── src/
-│   ├── __tests__/              # Test setup and configuration
-│   │   └── setup.ts           # Jest test setup (console suppression)
-│   ├── api/                    # API layer
-│   │   ├── errors/             # Custom HTTP error classes
-│   │   │   └── http-errors.ts
-│   │   ├── middleware/        # Express middleware
-│   │   │   └── no-cache.ts    # HTTP cache control middleware
-│   │   ├── routes/            # API route handlers
-│   │   │   ├── __tests__/     # Route integration tests
-│   │   │   │   └── campaigns.test.ts
-│   │   │   ├── campaigns.ts   # Campaign endpoints
-│   │   │   ├── dashboard.ts   # Dashboard endpoints
-│   │   │   ├── indicators.ts  # Indicator endpoints
-│   │   │   └── index.ts       # Route initialization
-│   │   └── server.ts          # Express server setup
-│   └── data/                   # Data access layer
-│       ├── campaigns.ts        # Campaign data queries
-│       ├── dashboard.ts         # Dashboard data queries
-│       ├── indicators.ts        # Indicator data queries
-│       └── database/           # Database clients
-│           ├── db.ts          # SQLite database client
-│           └── redis.ts        # Redis client
-├── backup/                     # Database backup files
-├── docker-compose.yml          # Docker services configuration
-├── docker-entrypoint.sh        # SQLite container entrypoint
-├── Dockerfile                  # SQLite database container
-├── jest.config.js              # Jest test configuration
-├── package.json                # Dependencies and scripts
-├── tsconfig.json               # TypeScript configuration
-└── README.md                   # Project documentation
-```
+##### Refer to arquitecture.md [architecture.md](./architecture.md) ❤️
 
 ## Scripts
 
