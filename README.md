@@ -48,22 +48,28 @@ REDIS_PORT=6379
 REDIS_PASSWORD=
 REDIS_DB=0
 ```
-
+---
 ## Running the Application
 
 ### Development Mode
 
-1. Start Redis and SQLite database using Docker Compose:
+1. Database 💥
+
+#### ⚠️ Paste the SQLite Database Backup threat_intel.db into the /backup directory
+
+2. Start Redis and SQLite database using Docker Compose:
 ```bash
-docker-compose up -d
+docker-compose up -d &
 ```
 
-2. Start the development server:
+3. Start the development server:
 ```bash
 npm run dev
 ```
 
 The API will be available at `http://localhost:3000`
+
+The Swagger documentation at `http://localhost:3000/api-docs`
 
 ### Production Mode
 
